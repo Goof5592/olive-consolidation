@@ -169,6 +169,10 @@
 </div>
 
 <div class="settings-wrap">
+  <div style="display:flex;gap:8px;margin-bottom:6px;">
+    <button class="btn btn-sm" style="background:#f0f4ff;color:#3a5fc8;border:1px solid #c5d0f5;font-size:0.75rem;" onclick="exportData()">📤 データをエクスポート</button>
+    <label class="btn btn-sm" style="background:#f0fff4;color:#2e7d32;border:1px solid #c8e6c9;font-size:0.75rem;cursor:pointer;">📥 インポート<input type="file" accept=".json" style="display:none" onchange="importData(event)"></label>
+  </div>
   <div class="settings-toggle" onclick="toggleSettings()">⚙️ 還元率設定 <span id="settings-arrow">▼</span></div>
   <div class="settings-panel" id="settings-panel">
     <div class="settings-row">
@@ -271,7 +275,7 @@ let editingId = null;
 
 const CAT_LABELS = { fixed:'固定費', conveni:'コンビニ', variable:'変動費', expense:'会社経費', other:'その他' };
 const CAT_CLASS = { fixed:'cat-fixed', conveni:'cat-conveni', variable:'cat-variable', expense:'cat-expense', other:'cat-other' };
-const METHOD_LABELS = { bank:'銀行振込', amex:'AMEX', ponta:'Ponta', recruit:'リクルート', debit:'口座引落', cash:'現金', paypal:'PayPal等', already:'Olive済' };
+const METHOD_LABELS = { bank:'銀行振込', amex:'AMEX', ponta:'Ponta', recruit:'リクルート', 'other-card':'他社カード', debit:'口座引落', cash:'現金', paypal:'PayPal等', already:'Olive済' };
 const PRIORITY_LABELS = { high:'⚡高', mid:'●中', low:'▽低' };
 const PRIORITY_CLASS = { high:'p-high', mid:'p-mid', low:'p-low' };
 const PRIORITY_ORDER = { high:0, mid:1, low:2 };
@@ -478,6 +482,34 @@ function showToast(msg) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'olive-data.json';
+  a.click();
+  showToast('📤 エクスポートしました');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) throw new Error();
+      items = data;
+      save(); renderList(); updateDashboard();
+      showToast(`📥 ${data.length}件をインポートしました`);
+    } catch {
+      alert('ファイルが正しくありません');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
 }
 
 // Init
