@@ -293,7 +293,15 @@ async function load() {
     setSyncStatus('⚠️ 接続エラー');
     return;
   }
-  items = data.items && data.items.length > 0 ? data.items : getDefaultItems();
+  if (data.items && data.items.length > 0) {
+    // Supabaseにデータあり → そちらを使う
+    items = data.items;
+  } else {
+    // Supabaseが空 → localStorageのデータを移行
+    const local = localStorage.getItem('olive_items_v2');
+    items = local ? JSON.parse(local) : getDefaultItems();
+    await save(); // Supabaseにアップロード
+  }
   renderList();
   updateDashboard();
   setSyncStatus('✅ 同期済み');
