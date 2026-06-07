@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Olive Gold 支払い一本化管理</title>
+<style>
+  :root {
+    --olive: #2d6a4f;
+    --olive-light: #40916c;
+    --olive-pale: #d8f3dc;
+    --gold: #f4a261;
+    --gold-light: #ffd6a5;
+    --bg: #f8f9fa;
+    --card: #ffffff;
+    --text: #212529;
+    --muted: #6c757d;
+    --border: #dee2e6;
+    --danger: #dc3545;
+    --success: #198754;
+    --radius: 12px;
+    --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* Header */
+  .header { background: linear-gradient(135deg, var(--olive) 0%, var(--olive-light) 100%); color: white; padding: 20px 16px 24px; }
+  .header h1 { font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+  .header p { font-size: 0.82rem; opacity: 0.85; margin-top: 4px; }
+  .header-badge { background: var(--gold); color: #333; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+
+  /* Dashboard */
+  .dashboard { padding: 0 16px; margin-top: -12px; }
+  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (min-width: 600px) { .dash-grid { grid-template-columns: repeat(4, 1fr); } }
+  .dash-card { background: var(--card); border-radius: var(--radius); padding: 14px 12px; box-shadow: var(--shadow); text-align: center; }
+  .dash-card .label { font-size: 0.72rem; color: var(--muted); margin-bottom: 4px; }
+  .dash-card .value { font-size: 1.4rem; font-weight: 700; color: var(--olive); }
+  .dash-card .sub { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+  .dash-card.gold .value { color: var(--gold); }
+  .dash-card.goal .value { color: var(--success); }
+
+  /* Progress bar */
+  .progress-wrap { padding: 12px 16px 0; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); margin-bottom: 4px; }
+  .progress-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--olive), var(--olive-light)); border-radius: 4px; transition: width 0.4s ease; }
+
+  /* Controls */
+  .controls { padding: 14px 16px 6px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .btn { padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.83rem; font-weight: 600; transition: all 0.15s; }
+  .btn-primary { background: var(--olive); color: white; }
+  .btn-primary:hover { background: var(--olive-light); }
+  .btn-sm { padding: 4px 10px; font-size: 0.75rem; border-radius: 6px; }
+  .btn-danger { background: #fff0f0; color: var(--danger); border: 1px solid #ffcdd2; }
+  .btn-danger:hover { background: #ffcdd2; }
+  .btn-edit { background: #f0f4ff; color: #3a5fc8; border: 1px solid #c5d0f5; }
+  .btn-edit:hover { background: #c5d0f5; }
+  .filter-group { display: flex; gap: 4px; margin-left: auto; }
+  .filter-btn { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border); background: white; cursor: pointer; font-size: 0.78rem; color: var(--muted); transition: all 0.15s; }
+  .filter-btn.active { background: var(--olive); color: white; border-color: var(--olive); }
+  select.sort-sel { padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 0.8rem; background: white; cursor: pointer; }
+
+  /* List */
+  .list { padding: 0 16px 80px; display: flex; flex-direction: column; gap: 8px; }
+  .item { background: var(--card); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); display: flex; align-items: flex-start; gap: 12px; transition: all 0.2s; border-left: 4px solid var(--border); }
+  .item.done { border-left-color: var(--success); background: #f8fff9; opacity: 0.8; }
+  .item.done .item-name { text-decoration: line-through; color: var(--muted); }
+  .item-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border); cursor: pointer; flex-shrink: 0; margin-top: 1px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; background: white; }
+  .item-check.checked { background: var(--success); border-color: var(--success); }
+  .item-check.checked::after { content: '✓'; color: white; font-size: 0.75rem; font-weight: 700; }
+  .item-body { flex: 1; min-width: 0; }
+  .item-row1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .item-name { font-weight: 600; font-size: 0.95rem; }
+  .cat-badge { font-size: 0.65rem; padding: 2px 6px; border-radius: 10px; font-weight: 600; white-space: nowrap; }
+  .cat-fixed { background: #e8f4fd; color: #1565c0; }
+  .cat-variable { background: #fff3e0; color: #e65100; }
+  .cat-expense { background: #f3e5f5; color: #6a1b9a; }
+  .cat-other { background: #e8f5e9; color: #2e7d32; }
+  .cat-conveni { background: #fff8e1; color: #f57f17; }
+  .item-row2 { display: flex; gap: 10px; margin-top: 4px; flex-wrap: wrap; align-items: center; }
+  .item-method { font-size: 0.75rem; color: var(--muted); display: flex; align-items: center; gap: 3px; }
+  .item-method .method-badge { background: var(--border); padding: 1px 6px; border-radius: 4px; font-size: 0.7rem; }
+  .item-amount { font-size: 0.9rem; font-weight: 700; color: var(--olive); }
+  .item-points { font-size: 0.72rem; color: var(--gold); font-weight: 600; }
+  .item-priority { font-size: 0.7rem; }
+  .p-high { color: var(--danger); }
+  .p-mid { color: var(--gold); }
+  .p-low { color: var(--muted); }
+  .item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: flex-end; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  @media (min-width: 600px) { .modal-overlay { align-items: center; } }
+  .modal { background: white; border-radius: 20px 20px 0 0; width: 100%; max-width: 500px; padding: 24px 20px 32px; max-height: 90vh; overflow-y: auto; }
+  @media (min-width: 600px) { .modal { border-radius: 20px; } }
+  .modal h2 { font-size: 1.1rem; margin-bottom: 18px; color: var(--olive); }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.9rem; outline: none; transition: border 0.15s;
+  }
+  .form-group input:focus, .form-group select:focus { border-color: var(--olive); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 18px; }
+  .modal-actions .btn { flex: 1; padding: 12px; font-size: 0.9rem; }
+  .btn-cancel { background: var(--bg); color: var(--muted); }
+
+  /* Settings */
+  .settings-wrap { padding: 8px 16px 0; }
+  .settings-toggle { font-size: 0.78rem; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 4px; }
+  .settings-panel { display: none; background: var(--card); border-radius: var(--radius); padding: 14px; margin-top: 6px; box-shadow: var(--shadow); }
+  .settings-panel.open { display: block; }
+  .settings-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .settings-row label { font-size: 0.8rem; flex: 1; }
+  .settings-row input { width: 80px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; text-align: right; }
+
+  /* Empty */
+  .empty { text-align: center; padding: 48px 16px; color: var(--muted); font-size: 0.9rem; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 20px; border-radius: 20px; font-size: 0.85rem; z-index: 200; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>💳 Olive Gold 支払い一本化 <span class="header-badge">Vポイント最大化</span></h1>
+  <p>支払いをOliveゴールドに集約してVポイントを貯めよう</p>
+</div>
+
+<div class="dashboard">
+  <div class="dash-grid">
+    <div class="dash-card">
+      <div class="label">切替完了</div>
+      <div class="value" id="d-progress">0/0</div>
+      <div class="sub">件</div>
+    </div>
+    <div class="dash-card">
+      <div class="label">集約済み金額</div>
+      <div class="value" id="d-amount">¥0</div>
+      <div class="sub" id="d-amount-sub">/ ¥0</div>
+    </div>
+    <div class="dash-card gold">
+      <div class="label">予想月間ポイント</div>
+      <div class="value" id="d-monthly-pt">0</div>
+      <div class="sub">Vポイント</div>
+    </div>
+    <div class="dash-card goal">
+      <div class="label">予想年間ポイント</div>
+      <div class="value" id="d-yearly-pt">0</div>
+      <div class="sub">目標 256,000pt</div>
+    </div>
+  </div>
+</div>
+
+<div class="progress-wrap">
+  <div class="progress-label">
+    <span>切替進捗</span>
+    <span id="p-pct">0%</span>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" id="p-fill" style="width:0%"></div></div>
+</div>
+
+<div class="settings-wrap">
+  <div class="settings-toggle" onclick="toggleSettings()">⚙️ 還元率設定 <span id="settings-arrow">▼</span></div>
+  <div class="settings-panel" id="settings-panel">
+    <div class="settings-row">
+      <label>コンビニ還元率（%）<small style="color:var(--muted)">最大20%</small></label>
+      <input type="number" id="rate-conveni" value="20" min="1" max="20" onchange="saveSettings(); updateDashboard()">
+    </div>
+    <div class="settings-row">
+      <label>通常還元率（%）</label>
+      <input type="number" id="rate-normal" value="1" min="0.5" max="3" step="0.5" onchange="saveSettings(); updateDashboard()">
+    </div>
+    <div class="settings-row">
+      <label>年間ボーナス係数</label>
+      <input type="number" id="rate-bonus" value="1.0" min="1" max="2" step="0.1" onchange="saveSettings(); updateDashboard()">
+    </div>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="btn btn-primary" onclick="openModal()">＋ 支払いを追加</button>
+  <select class="sort-sel" id="sort-sel" onchange="renderList()">
+    <option value="amount-desc">金額が大きい順</option>
+    <option value="amount-asc">金額が小さい順</option>
+    <option value="priority">優先度順</option>
+    <option value="name">名前順</option>
+  </select>
+  <div class="filter-group">
+    <button class="filter-btn active" data-filter="all" onclick="setFilter('all')">すべて</button>
+    <button class="filter-btn" data-filter="undone" onclick="setFilter('undone')">未完了</button>
+    <button class="filter-btn" data-filter="done" onclick="setFilter('done')">完了</button>
+  </div>
+</div>
+
+<div class="list" id="list"></div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOutside(event)">
+  <div class="modal">
+    <h2 id="modal-title">支払いを追加</h2>
+    <input type="hidden" id="edit-id">
+    <div class="form-group">
+      <label>支払い名 *</label>
+      <input type="text" id="f-name" placeholder="例：電気代、Netflix、Amazon Prime">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>カテゴリ</label>
+        <select id="f-category">
+          <option value="fixed">固定費</option>
+          <option value="conveni">コンビニ</option>
+          <option value="variable">変動費</option>
+          <option value="expense">会社経費</option>
+          <option value="other">その他</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>優先度</label>
+        <select id="f-priority">
+          <option value="high">高</option>
+          <option value="mid">中</option>
+          <option value="low">低</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>月間金額（円）</label>
+      <input type="number" id="f-amount" placeholder="0" min="0">
+    </div>
+    <div class="form-group">
+      <label>現在の支払い方法</label>
+      <select id="f-method">
+        <option value="bank">銀行振込</option>
+        <option value="other-card">他社クレジットカード</option>
+        <option value="debit">口座引き落とし</option>
+        <option value="cash">現金</option>
+        <option value="paypal">PayPal等</option>
+        <option value="already">すでにOlive利用中</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>メモ</label>
+      <input type="text" id="f-memo" placeholder="変更時の注意など">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal()">キャンセル</button>
+      <button class="btn btn-primary" onclick="saveItem()">保存</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'olive_items_v2';
+const SETTINGS_KEY = 'olive_settings_v1';
+let items = [];
+let currentFilter = 'all';
+let editingId = null;
+
+const CAT_LABELS = { fixed:'固定費', conveni:'コンビニ', variable:'変動費', expense:'会社経費', other:'その他' };
+const CAT_CLASS = { fixed:'cat-fixed', conveni:'cat-conveni', variable:'cat-variable', expense:'cat-expense', other:'cat-other' };
+const METHOD_LABELS = { bank:'銀行振込', 'other-card':'他社カード', debit:'口座引落', cash:'現金', paypal:'PayPal等', already:'Olive済' };
+const PRIORITY_LABELS = { high:'⚡高', mid:'●中', low:'▽低' };
+const PRIORITY_CLASS = { high:'p-high', mid:'p-mid', low:'p-low' };
+const PRIORITY_ORDER = { high:0, mid:1, low:2 };
+
+function load() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  items = raw ? JSON.parse(raw) : getDefaultItems();
+  const s = localStorage.getItem(SETTINGS_KEY);
+  if (s) {
+    const settings = JSON.parse(s);
+    document.getElementById('rate-conveni').value = settings.conveni ?? 20;
+    document.getElementById('rate-normal').value = settings.normal ?? 1;
+    document.getElementById('rate-bonus').value = settings.bonus ?? 1.0;
+  }
+}
+
+function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
+function saveSettings() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+    conveni: parseFloat(document.getElementById('rate-conveni').value),
+    normal: parseFloat(document.getElementById('rate-normal').value),
+    bonus: parseFloat(document.getElementById('rate-bonus').value),
+  }));
+}
+
+function getDefaultItems() {
+  return [
+    { id: uid(), name: '電気代', category: 'fixed', priority: 'high', amount: 8000, method: 'debit', memo: '', done: false },
+    { id: uid(), name: 'ガス代', category: 'fixed', priority: 'high', amount: 5000, method: 'debit', memo: '', done: false },
+    { id: uid(), name: 'Netflix', category: 'fixed', priority: 'mid', amount: 1490, method: 'other-card', memo: '', done: false },
+    { id: uid(), name: 'Spotify', category: 'fixed', priority: 'mid', amount: 980, method: 'other-card', memo: '', done: false },
+    { id: uid(), name: 'Amazon Prime', category: 'fixed', priority: 'mid', amount: 600, method: 'other-card', memo: '', done: false },
+    { id: uid(), name: 'コンビニ利用', category: 'conveni', priority: 'mid', amount: 15000, method: 'cash', memo: 'セブン・ローソン等', done: false },
+  ];
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+function calcPoints(item) {
+  if (!item.done) return 0;
+  const rateC = parseFloat(document.getElementById('rate-conveni').value) / 100;
+  const rateN = parseFloat(document.getElementById('rate-normal').value) / 100;
+  const rate = item.category === 'conveni' ? rateC : rateN;
+  return Math.floor(item.amount * rate);
+}
+
+function calcPreviewPoints(item) {
+  const rateC = parseFloat(document.getElementById('rate-conveni').value) / 100;
+  const rateN = parseFloat(document.getElementById('rate-normal').value) / 100;
+  const rate = item.category === 'conveni' ? rateC : rateN;
+  return Math.floor(item.amount * rate);
+}
+
+function updateDashboard() {
+  const total = items.length;
+  const done = items.filter(i => i.done).length;
+  const totalAmt = items.reduce((s, i) => s + (i.amount||0), 0);
+  const doneAmt = items.filter(i => i.done).reduce((s, i) => s + (i.amount||0), 0);
+  const monthlyPt = items.reduce((s, i) => s + calcPoints(i), 0);
+  const bonus = parseFloat(document.getElementById('rate-bonus').value);
+  const yearlyPt = Math.floor(monthlyPt * 12 * bonus);
+
+  document.getElementById('d-progress').textContent = `${done}/${total}`;
+  document.getElementById('d-amount').textContent = '¥' + doneAmt.toLocaleString();
+  document.getElementById('d-amount-sub').textContent = '/ ¥' + totalAmt.toLocaleString();
+  document.getElementById('d-monthly-pt').textContent = monthlyPt.toLocaleString();
+  document.getElementById('d-yearly-pt').textContent = yearlyPt.toLocaleString();
+
+  const pct = total > 0 ? Math.round(done / total * 100) : 0;
+  document.getElementById('p-fill').style.width = pct + '%';
+  document.getElementById('p-pct').textContent = pct + '%';
+}
+
+function getSorted(list) {
+  const sel = document.getElementById('sort-sel').value;
+  return [...list].sort((a, b) => {
+    if (sel === 'amount-desc') return (b.amount||0) - (a.amount||0);
+    if (sel === 'amount-asc') return (a.amount||0) - (b.amount||0);
+    if (sel === 'priority') return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+    if (sel === 'name') return a.name.localeCompare(b.name, 'ja');
+    return 0;
+  });
+}
+
+function renderList() {
+  let filtered = items;
+  if (currentFilter === 'done') filtered = items.filter(i => i.done);
+  if (currentFilter === 'undone') filtered = items.filter(i => !i.done);
+  const sorted = getSorted(filtered);
+
+  const el = document.getElementById('list');
+  if (sorted.length === 0) {
+    el.innerHTML = '<div class="empty">表示する項目がありません<br><small>「支払いを追加」ボタンで登録してください</small></div>';
+    return;
+  }
+
+  el.innerHTML = sorted.map(item => {
+    const pts = calcPreviewPoints(item);
+    return `
+    <div class="item ${item.done ? 'done' : ''}" id="item-${item.id}">
+      <div class="item-check ${item.done ? 'checked' : ''}" onclick="toggleDone('${item.id}')"></div>
+      <div class="item-body">
+        <div class="item-row1">
+          <span class="item-name">${esc(item.name)}</span>
+          <span class="cat-badge ${CAT_CLASS[item.category]}">${CAT_LABELS[item.category]}</span>
+          <span class="item-priority ${PRIORITY_CLASS[item.priority]}">${PRIORITY_LABELS[item.priority]}</span>
+        </div>
+        <div class="item-row2">
+          <span class="item-method">現在: <span class="method-badge">${METHOD_LABELS[item.method]}</span></span>
+          <span class="item-amount">¥${(item.amount||0).toLocaleString()}/月</span>
+          <span class="item-points">+${pts.toLocaleString()}pt/月</span>
+          ${item.memo ? `<span style="font-size:0.72rem;color:var(--muted)">📝${esc(item.memo)}</span>` : ''}
+        </div>
+      </div>
+      <div class="item-actions">
+        <button class="btn btn-sm btn-edit" onclick="openModal('${item.id}')">編集</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteItem('${item.id}')">削除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function toggleDone(id) {
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  item.done = !item.done;
+  save(); renderList(); updateDashboard();
+  showToast(item.done ? `✅ "${item.name}" を切り替え完了` : `↩ "${item.name}" を未完了に戻しました`);
+}
+
+function deleteItem(id) {
+  const item = items.find(i => i.id === id);
+  if (!item) return;
+  if (!confirm(`「${item.name}」を削除しますか？`)) return;
+  items = items.filter(i => i.id !== id);
+  save(); renderList(); updateDashboard();
+  showToast('🗑 削除しました');
+}
+
+function openModal(id) {
+  editingId = id || null;
+  document.getElementById('modal-title').textContent = id ? '支払いを編集' : '支払いを追加';
+  if (id) {
+    const item = items.find(i => i.id === id);
+    document.getElementById('f-name').value = item.name;
+    document.getElementById('f-category').value = item.category;
+    document.getElementById('f-priority').value = item.priority;
+    document.getElementById('f-amount').value = item.amount;
+    document.getElementById('f-method').value = item.method;
+    document.getElementById('f-memo').value = item.memo || '';
+  } else {
+    document.getElementById('f-name').value = '';
+    document.getElementById('f-category').value = 'fixed';
+    document.getElementById('f-priority').value = 'mid';
+    document.getElementById('f-amount').value = '';
+    document.getElementById('f-method').value = 'bank';
+    document.getElementById('f-memo').value = '';
+  }
+  document.getElementById('modal-overlay').classList.add('open');
+  document.getElementById('f-name').focus();
+}
+
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
+function closeModalOutside(e) { if (e.target === document.getElementById('modal-overlay')) closeModal(); }
+
+function saveItem() {
+  const name = document.getElementById('f-name').value.trim();
+  if (!name) { alert('支払い名を入力してください'); return; }
+  const data = {
+    name,
+    category: document.getElementById('f-category').value,
+    priority: document.getElementById('f-priority').value,
+    amount: parseInt(document.getElementById('f-amount').value) || 0,
+    method: document.getElementById('f-method').value,
+    memo: document.getElementById('f-memo').value.trim(),
+  };
+  if (editingId) {
+    const idx = items.findIndex(i => i.id === editingId);
+    items[idx] = { ...items[idx], ...data };
+  } else {
+    items.push({ id: uid(), done: false, ...data });
+  }
+  save(); closeModal(); renderList(); updateDashboard();
+  showToast(editingId ? '✏️ 更新しました' : '➕ 追加しました');
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.filter === f));
+  renderList();
+}
+
+function toggleSettings() {
+  const p = document.getElementById('settings-panel');
+  const a = document.getElementById('settings-arrow');
+  p.classList.toggle('open');
+  a.textContent = p.classList.contains('open') ? '▲' : '▼';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// Init
+load();
+renderList();
+updateDashboard();
+</script>
+</body>
+</html>
