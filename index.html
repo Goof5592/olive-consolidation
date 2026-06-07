@@ -7,6 +7,7 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Olive Gold 支払い一本化管理</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --olive: #2d6a4f;
@@ -132,7 +133,7 @@
 
 <div class="header">
   <h1>💳 Olive Gold 支払い一本化 <span class="header-badge">Vポイント最大化</span></h1>
-  <p>支払いをOliveゴールドに集約してVポイントを貯めよう</p>
+  <p>支払いをOliveゴールドに集約してVポイントを貯めよう &nbsp;<span id="sync-status" style="font-size:0.75rem;opacity:0.9;">⏳ 読込中...</span></p>
 </div>
 
 <div class="dashboard">
@@ -169,10 +170,6 @@
 </div>
 
 <div class="settings-wrap">
-  <div style="display:flex;gap:8px;margin-bottom:6px;">
-    <button class="btn btn-sm" style="background:#f0f4ff;color:#3a5fc8;border:1px solid #c5d0f5;font-size:0.75rem;" onclick="exportData()">📤 データをエクスポート</button>
-    <label class="btn btn-sm" style="background:#f0fff4;color:#2e7d32;border:1px solid #c8e6c9;font-size:0.75rem;cursor:pointer;">📥 インポート<input type="file" accept=".json" style="display:none" onchange="importData(event)"></label>
-  </div>
   <div class="settings-toggle" onclick="toggleSettings()">⚙️ 還元率設定 <span id="settings-arrow">▼</span></div>
   <div class="settings-panel" id="settings-panel">
     <div class="settings-row">
@@ -267,7 +264,11 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const STORAGE_KEY = 'olive_items_v2';
+// Supabase
+const SUPABASE_URL = 'https://zpqqslmauvimevydqeru.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_2Icc_7eTGBwhFx5szqeMmg_D9DbNq34';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 const SETTINGS_KEY = 'olive_settings_v1';
 let items = [];
 let currentFilter = 'all';
@@ -280,9 +281,30 @@ const PRIORITY_LABELS = { high:'⚡高', mid:'●中', low:'▽低' };
 const PRIORITY_CLASS = { high:'p-high', mid:'p-mid', low:'p-low' };
 const PRIORITY_ORDER = { high:0, mid:1, low:2 };
 
-function load() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  items = raw ? JSON.parse(raw) : getDefaultItems();
+function setSyncStatus(msg) {
+  document.getElementById('sync-status').textContent = msg;
+}
+
+async function load() {
+  loadSettings();
+  setSyncStatus('⏳ 読込中...');
+  const { data, error } = await db.from('olive_data').select('items').eq('id', 'shared').single();
+  if (error || !data) {
+    setSyncStatus('⚠️ 接続エラー');
+    return;
+  }
+  items = data.items && data.items.length > 0 ? data.items : getDefaultItems();
+  renderList();
+  updateDashboard();
+  setSyncStatus('✅ 同期済み');
+}
+
+async function save() {
+  setSyncStatus('🔄 保存中...');
+  const { error } = await db.from('olive_data').upsert({ id: 'shared', items, updated_at: new Date().toISOString() });
+  setSyncStatus(error ? '⚠️ 保存失敗' : '✅ 同期済み');
+}
+function loadSettings() {
   const s = localStorage.getItem(SETTINGS_KEY);
   if (s) {
     const settings = JSON.parse(s);
@@ -292,7 +314,6 @@ function load() {
   }
 }
 
-function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
 function saveSettings() {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify({
     conveni: parseFloat(document.getElementById('rate-conveni').value),
@@ -400,21 +421,23 @@ function renderList() {
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-function toggleDone(id) {
+async function toggleDone(id) {
   const item = items.find(i => i.id === id);
   if (!item) return;
   item.done = !item.done;
-  save(); renderList(); updateDashboard();
+  renderList(); updateDashboard();
   showToast(item.done ? `✅ "${item.name}" を切り替え完了` : `↩ "${item.name}" を未完了に戻しました`);
+  await save();
 }
 
-function deleteItem(id) {
+async function deleteItem(id) {
   const item = items.find(i => i.id === id);
   if (!item) return;
   if (!confirm(`「${item.name}」を削除しますか？`)) return;
   items = items.filter(i => i.id !== id);
-  save(); renderList(); updateDashboard();
+  renderList(); updateDashboard();
   showToast('🗑 削除しました');
+  await save();
 }
 
 function openModal(id) {
@@ -443,7 +466,7 @@ function openModal(id) {
 function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); }
 function closeModalOutside(e) { if (e.target === document.getElementById('modal-overlay')) closeModal(); }
 
-function saveItem() {
+async function saveItem() {
   const name = document.getElementById('f-name').value.trim();
   if (!name) { alert('支払い名を入力してください'); return; }
   const data = {
@@ -460,8 +483,9 @@ function saveItem() {
   } else {
     items.push({ id: uid(), done: false, ...data });
   }
-  save(); closeModal(); renderList(); updateDashboard();
+  closeModal(); renderList(); updateDashboard();
   showToast(editingId ? '✏️ 更新しました' : '➕ 追加しました');
+  await save();
 }
 
 function setFilter(f) {
@@ -484,38 +508,8 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-function exportData() {
-  const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'olive-data.json';
-  a.click();
-  showToast('📤 エクスポートしました');
-}
-
-function importData(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (!Array.isArray(data)) throw new Error();
-      items = data;
-      save(); renderList(); updateDashboard();
-      showToast(`📥 ${data.length}件をインポートしました`);
-    } catch {
-      alert('ファイルが正しくありません');
-    }
-  };
-  reader.readAsText(file);
-  event.target.value = '';
-}
-
 // Init
 load();
-renderList();
-updateDashboard();
 </script>
 </body>
 </html>
