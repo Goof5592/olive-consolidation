@@ -237,7 +237,9 @@
       <label>現在の支払い方法</label>
       <select id="f-method">
         <option value="bank">銀行振込</option>
-        <option value="other-card">他社クレジットカード</option>
+        <option value="amex">AMEX</option>
+        <option value="ponta">Ponta</option>
+        <option value="recruit">リクルート</option>
         <option value="debit">口座引き落とし</option>
         <option value="cash">現金</option>
         <option value="paypal">PayPal等</option>
@@ -266,7 +268,7 @@ let editingId = null;
 
 const CAT_LABELS = { fixed:'固定費', conveni:'コンビニ', variable:'変動費', expense:'会社経費', other:'その他' };
 const CAT_CLASS = { fixed:'cat-fixed', conveni:'cat-conveni', variable:'cat-variable', expense:'cat-expense', other:'cat-other' };
-const METHOD_LABELS = { bank:'銀行振込', 'other-card':'他社カード', debit:'口座引落', cash:'現金', paypal:'PayPal等', already:'Olive済' };
+const METHOD_LABELS = { bank:'銀行振込', amex:'AMEX', ponta:'Ponta', recruit:'リクルート', debit:'口座引落', cash:'現金', paypal:'PayPal等', already:'Olive済' };
 const PRIORITY_LABELS = { high:'⚡高', mid:'●中', low:'▽低' };
 const PRIORITY_CLASS = { high:'p-high', mid:'p-mid', low:'p-low' };
 const PRIORITY_ORDER = { high:0, mid:1, low:2 };
